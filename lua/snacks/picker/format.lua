@@ -44,11 +44,14 @@ function M.filename(item, picker)
   if type(truncate) == "function" then
     path = truncate(item, picker)
   elseif type(truncate) == "number" then
-    path = Snacks.picker.util.truncpath(path, truncate, { cwd = picker:cwd() })
+    path = Snacks.picker.util.truncpath(path, truncate, { cwd = picker:cwd(), roughly = true })
   elseif truncate == "fit" then
-    local len = vim.api.nvim_win_get_width(picker.list.win.win) - 2
-    -- TODO:
-    path = Snacks.picker.util.truncpath(path, len, { cwd = picker:cwd(), roughly = false })
+    local prefix = { buffer = 7 }
+    local len = vim.api.nvim_win_get_width(picker.list.win.win)
+      - Snacks.picker.highlight.offset(ret)
+      - (prefix[picker.opts.format] or 0)
+      - 2
+    path = Snacks.picker.util.truncpath(path, len, { cwd = picker:cwd() })
   end
 
   local dir, file = path:match("^(.*)/(.+)$")

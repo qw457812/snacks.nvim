@@ -15,9 +15,10 @@ function M.path(item)
 end
 
 ---@param path string
----@param len? number
+---@param len number
 ---@param opts? {cwd?: string, roughly?: boolean}
 function M.truncpath(path, len, opts)
+  local roughly = opts and opts.roughly
   local cwd = vim.fs.normalize(opts and opts.cwd or vim.fn.getcwd(), { _fast = true, expand_env = false })
   local home = vim.fs.normalize("~")
   path = vim.fs.normalize(path, { _fast = true, expand_env = false })
@@ -40,18 +41,36 @@ function M.truncpath(path, len, opts)
 
   local parts = vim.split(path, "/")
   if #parts < 2 then
-    return path
+    return roughly and path or M.truncate(path, len, -1)
   end
+
   local ret = table.remove(parts)
+  local rw = vim.api.nvim_strwidth(ret)
+  if not roughly and rw >= len then
+    return M.truncate(ret, len, -1)
+  end
+
   local first = table.remove(parts, 1)
   if first == "~" and #parts > 0 then
     first = "~/" .. table.remove(parts, 1)
   end
-  local width = vim.api.nvim_strwidth(ret) + vim.api.nvim_strwidth(first) + 3
+  local width = rw + vim.api.nvim_strwidth(first) + 3
+  if not roughly and width > len then
+    local trunc_width = len - rw - 3
+    return trunc_width <= 1 and "………/" .. ret or M.truncate(first, trunc_width) .. "/…/" .. ret
+  end
+
   while width < len and #parts > 0 do
     local part = table.remove(parts) .. "/"
     local w = vim.api.nvim_strwidth(part)
     if width + w > len then
+      if not roughly then
+        if len - width == 1 then
+          return first .. "/……/" .. ret
+        else
+          ret = M.truncate(part, len - width, -1) .. ret
+        end
+      end
       break
     end
     ret = part .. ret
@@ -132,11 +151,15 @@ function M.align(text, width, opts)
   return (" "):rep(left) .. text .. (" "):rep(right)
 end
 
+-- always return "…" when width <= 1
 ---@param text string
 ---@param width number
-function M.truncate(text, width)
-  if vim.api.nvim_strwidth(text) > width then
-    return vim.fn.strcharpart(text, 0, width - 1) .. "…"
+---@param direction? -1 | 1
+function M.truncate(text, width, direction)
+  local tw = vim.api.nvim_strwidth(text)
+  if tw > width then
+    return direction == -1 and "…" .. vim.fn.strcharpart(text, tw - width + 1, width - 1)
+      or vim.fn.strcharpart(text, 0, width - 1) .. "…"
   end
   return text
 end
