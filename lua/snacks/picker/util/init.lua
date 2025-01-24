@@ -16,7 +16,7 @@ end
 
 ---@param path string
 ---@param len? number
----@param opts? {cwd?: string}
+---@param opts? {cwd?: string, roughly?: boolean}
 function M.truncpath(path, len, opts)
   local cwd = vim.fs.normalize(opts and opts.cwd or vim.fn.getcwd(), { _fast = true, expand_env = false })
   local home = vim.fs.normalize("~")

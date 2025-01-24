@@ -25,8 +25,8 @@ function M.filename(item, picker)
   if not item.file then
     return ret
   end
+
   local path = Snacks.picker.util.path(item) or item.file
-  path = Snacks.picker.util.truncpath(path, picker.opts.formatters.file.truncate or 40, { cwd = picker:cwd() })
   local name, cat = path, "file"
   if item.buf and vim.api.nvim_buf_is_loaded(item.buf) then
     name = vim.bo[item.buf].filetype
@@ -34,11 +34,21 @@ function M.filename(item, picker)
   elseif item.dir then
     cat = "directory"
   end
-
   if picker.opts.icons.files.enabled ~= false then
     local icon, hl = Snacks.util.icon(name, cat)
     local padded_icon = icon:sub(-1) == " " and icon or icon .. " "
     ret[#ret + 1] = { padded_icon, hl, virtual = true }
+  end
+
+  local truncate = picker.opts.formatters.file.truncate
+  if type(truncate) == "function" then
+    path = truncate(item, picker)
+  elseif type(truncate) == "number" then
+    path = Snacks.picker.util.truncpath(path, truncate, { cwd = picker:cwd() })
+  elseif truncate == "fit" then
+    local len = vim.api.nvim_win_get_width(picker.list.win.win) - 2
+    -- TODO:
+    path = Snacks.picker.util.truncpath(path, len, { cwd = picker:cwd(), roughly = false })
   end
 
   local dir, file = path:match("^(.*)/(.+)$")
