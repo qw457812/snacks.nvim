@@ -72,12 +72,9 @@ function M.filename(item, picker)
   elseif type(truncate) == "number" then
     path = Snacks.picker.util.truncpath(path, truncate, { cwd = picker:cwd() })
   elseif truncate == "auto" or truncate == "align" then
-    local prefixes = { file = 0, buffer = 7, lsp_symbol = 40 }
-    if vim.tbl_contains(vim.tbl_keys(prefixes), picker.opts.format) then
-      local len = vim.api.nvim_win_get_width(picker.list.win.win)
-        - Snacks.picker.highlight.offset(ret)
-        - prefixes[picker.opts.format]
-        - 2
+    local prefix = ({ file = 0, git_status = 3, buffer = 7, lsp_symbol = 40 })[picker.opts.format]
+    if prefix then
+      local len = vim.api.nvim_win_get_width(picker.list.win.win) - Snacks.picker.highlight.offset(ret) - prefix - 2
       path = Snacks.picker.util.truncpath(path, math.max(len, 15), { cwd = picker:cwd(), roughly = truncate == "auto" })
     else
       path = Snacks.picker.util.truncpath(path, 40, { cwd = picker:cwd() })
