@@ -67,9 +67,7 @@ function M.filename(item, picker)
   end
 
   local truncate = picker.opts.formatters.file.truncate
-  if type(truncate) == "function" then
-    path = truncate(item, picker) or path
-  elseif type(truncate) == "number" then
+  if type(truncate) == "number" then
     path = Snacks.picker.util.truncpath(path, truncate, { cwd = picker:cwd() })
   elseif truncate == "auto" or truncate == "align" then
     local prefix = ({ file = 0, git_status = 3, buffer = 7, lsp_symbol = 40 })[picker.opts.format]
