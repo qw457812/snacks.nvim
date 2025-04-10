@@ -69,6 +69,11 @@ function M.pick(source, opts)
     opts.source = "pickers"
     return M.pick(opts)
   end
+  local current = opts.source and M.get({ source = opts.source })[1]
+  if current then
+    current:close()
+    return
+  end
   return require("snacks.picker.core.picker").new(opts)
 end
 
@@ -88,6 +93,13 @@ end
 ---@private
 function M.health()
   require("snacks.picker.core._health").health()
+end
+
+--- Get active pickers, optionally filtered by source,
+--- or the current tab
+---@param opts? {source?: string, tab?: boolean} tab defaults to true
+function M.get(opts)
+  return require("snacks.picker.core.picker").get(opts)
 end
 
 return M

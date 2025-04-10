@@ -2,11 +2,6 @@ local M = {}
 
 local uv = vim.uv or vim.loop
 
----@class snacks.picker
----@field grep fun(opts?: snacks.picker.grep.Config): snacks.Picker
----@field grep_word fun(opts?: snacks.picker.grep.Config): snacks.Picker
----@field grep_buffers fun(opts?: snacks.picker.grep.Config): snacks.Picker
-
 ---@param opts snacks.picker.grep.Config
 ---@param filter snacks.picker.Filter
 local function get_cmd(opts, filter)
@@ -93,7 +88,7 @@ local function get_cmd(opts, filter)
 
   -- dirs
   if #paths > 0 then
-    paths = vim.tbl_map(vim.fs.normalize, paths) ---@type string[]
+    paths = vim.tbl_map(svim.fs.normalize, paths) ---@type string[]
     vim.list_extend(args, paths)
   end
 
@@ -107,8 +102,11 @@ function M.grep(opts, ctx)
     return function() end
   end
   local absolute = (opts.dirs and #opts.dirs > 0) or opts.buffers or opts.rtp
-  local cwd = not absolute and vim.fs.normalize(opts and opts.cwd or uv.cwd() or ".") or nil
+  local cwd = not absolute and svim.fs.normalize(opts and opts.cwd or uv.cwd() or ".") or nil
   local cmd, args = get_cmd(opts, ctx.filter)
+  if opts.debug.grep then
+    Snacks.notify.info("grep: " .. cmd .. " " .. table.concat(args, " "))
+  end
   return require("snacks.picker.source.proc").proc({
     opts,
     {
@@ -121,7 +119,7 @@ function M.grep(opts, ctx)
         local file, line, col, text = item.text:match("^(.+):(%d+):(%d+):(.*)$")
         if not file then
           if not item.text:match("WARNING") then
-            error("invalid grep output: " .. item.text)
+            Snacks.notify.error("invalid grep output:\n" .. item.text)
           end
           return false
         else

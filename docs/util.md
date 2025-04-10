@@ -32,9 +32,19 @@ Snacks.util.bo(buf, bo)
 ### `Snacks.util.color()`
 
 ```lua
----@param group string hl group to get color from
+---@param group string|string[] hl group to get color from
 ---@param prop? string property to get. Defaults to "fg"
 Snacks.util.color(group, prop)
+```
+
+### `Snacks.util.debounce()`
+
+```lua
+---@generic T
+---@param fn T
+---@param opts? {ms?:number}
+---@return T
+Snacks.util.debounce(fn, opts)
 ```
 
 ### `Snacks.util.file_decode()`
@@ -55,6 +65,16 @@ Encodes a string to be used as a file name.
 Snacks.util.file_encode(str)
 ```
 
+### `Snacks.util.get_lang()`
+
+```lua
+---@param lang string|number|nil
+---@overload fun(buf:number):string?
+---@overload fun(ft:string):string?
+---@return string?
+Snacks.util.get_lang(lang)
+```
+
 ### `Snacks.util.icon()`
 
 Get an icon from `mini.icons` or `nvim-web-devicons`.
@@ -62,8 +82,16 @@ Get an icon from `mini.icons` or `nvim-web-devicons`.
 ```lua
 ---@param name string
 ---@param cat? string defaults to "file"
+---@param opts? { fallback?: {dir?:string, file?:string} }
 ---@return string, string?
-Snacks.util.icon(name, cat)
+Snacks.util.icon(name, cat, opts)
+```
+
+### `Snacks.util.is_float()`
+
+```lua
+---@param win? number
+Snacks.util.is_float(win)
 ```
 
 ### `Snacks.util.is_transparent()`
@@ -108,6 +136,17 @@ Otherwise, it is called when the module is loaded.
 Snacks.util.on_module(modname, cb)
 ```
 
+### `Snacks.util.parse()`
+
+Parse async when available.
+
+```lua
+---@param parser vim.treesitter.LanguageTree
+---@param range boolean|Range|nil: Parse this range in the parser's source.
+---@param on_parse fun(err?: string, trees?: table<integer, TSTree>) Function invoked when parsing completes.
+Snacks.util.parse(parser, range, on_parse)
+```
+
 ### `Snacks.util.redraw()`
 
 Redraw the window.
@@ -149,6 +188,12 @@ Ensures the hl groups are always set, even after a colorscheme change.
 Snacks.util.set_hl(groups, opts)
 ```
 
+### `Snacks.util.spinner()`
+
+```lua
+Snacks.util.spinner()
+```
+
 ### `Snacks.util.throttle()`
 
 ```lua
@@ -172,12 +217,22 @@ Get a buffer or global variable.
 Snacks.util.var(buf, name, default)
 ```
 
+### `Snacks.util.winhl()`
+
+Merges vim.wo.winhighlight options.
+Option values can be a string or a dictionary.
+
+```lua
+---@param ... string|table<string, string>
+Snacks.util.winhl(...)
+```
+
 ### `Snacks.util.wo()`
 
 Set window-local options.
 
 ```lua
 ---@param win number
----@param wo vim.wo|{}
+---@param wo vim.wo|{}|{winhighlight: string|table<string, string>}
 Snacks.util.wo(win, wo)
 ```

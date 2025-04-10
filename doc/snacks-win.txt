@@ -1,4 +1,4 @@
-*snacks-win.txt*                                                   snacks.nvim
+*snacks-win*                                                    snacks_win
 
 ==============================================================================
 Table of Contents                               *snacks-win-table-of-contents*
@@ -24,19 +24,23 @@ Table of Contents                               *snacks-win-table-of-contents*
   - win:destroy()                            |snacks-win-module-win:destroy()|
   - win:dim()                                    |snacks-win-module-win:dim()|
   - win:execute()                            |snacks-win-module-win:execute()|
+  - win:fixbuf()                              |snacks-win-module-win:fixbuf()|
   - win:focus()                                |snacks-win-module-win:focus()|
   - win:has_border()                      |snacks-win-module-win:has_border()|
   - win:hide()                                  |snacks-win-module-win:hide()|
+  - win:hscroll()                            |snacks-win-module-win:hscroll()|
   - win:is_floating()                    |snacks-win-module-win:is_floating()|
   - win:line()                                  |snacks-win-module-win:line()|
   - win:lines()                                |snacks-win-module-win:lines()|
   - win:map()                                    |snacks-win-module-win:map()|
   - win:on()                                      |snacks-win-module-win:on()|
+  - win:on_current_tab()              |snacks-win-module-win:on_current_tab()|
   - win:on_resize()                        |snacks-win-module-win:on_resize()|
   - win:parent_size()                    |snacks-win-module-win:parent_size()|
   - win:redraw()                              |snacks-win-module-win:redraw()|
   - win:scratch()                            |snacks-win-module-win:scratch()|
   - win:scroll()                              |snacks-win-module-win:scroll()|
+  - win:set_buf()                            |snacks-win-module-win:set_buf()|
   - win:set_title()                        |snacks-win-module-win:set_title()|
   - win:show()                                  |snacks-win-module-win:show()|
   - win:size()                                  |snacks-win-module-win:size()|
@@ -269,7 +273,7 @@ SPLIT                                                *snacks-win-styles-split*
     ---@field backdrop? snacks.win
     ---@field keys snacks.win.Keys[]
     ---@field events (snacks.win.Event|{event:string|string[]})[]
-    ---@field meta table<string, string>
+    ---@field meta table<string, any>
     ---@field closed? boolean
     Snacks.win = {}
 <
@@ -362,6 +366,13 @@ WIN:EXECUTE()                                *snacks-win-module-win:execute()*
 <
 
 
+WIN:FIXBUF()                                  *snacks-win-module-win:fixbuf()*
+
+>lua
+    win:fixbuf()
+<
+
+
 WIN:FOCUS()                                    *snacks-win-module-win:focus()*
 
 >lua
@@ -380,6 +391,14 @@ WIN:HIDE()                                      *snacks-win-module-win:hide()*
 
 >lua
     win:hide()
+<
+
+
+WIN:HSCROLL()                                *snacks-win-module-win:hscroll()*
+
+>lua
+    ---@param left? boolean
+    win:hscroll(left)
 <
 
 
@@ -423,6 +442,13 @@ WIN:ON()                                          *snacks-win-module-win:on()*
 <
 
 
+WIN:ON_CURRENT_TAB()                  *snacks-win-module-win:on_current_tab()*
+
+>lua
+    win:on_current_tab()
+<
+
+
 WIN:ON_RESIZE()                            *snacks-win-module-win:on_resize()*
 
 >lua
@@ -457,6 +483,14 @@ WIN:SCROLL()                                  *snacks-win-module-win:scroll()*
 >lua
     ---@param up? boolean
     win:scroll(up)
+<
+
+
+WIN:SET_BUF()                                *snacks-win-module-win:set_buf()*
+
+>lua
+    ---@param buf number
+    win:set_buf(buf)
 <
 
 

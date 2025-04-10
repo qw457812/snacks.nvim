@@ -5,10 +5,10 @@ local M = {}
 
 local uv = vim.uv or vim.loop
 M.USE_QUEUE = true
-local islist = vim.islist or vim.tbl_islist
 
 ---@class snacks.picker.proc.Config: snacks.picker.Config
 ---@field cmd string
+---@field sep? string
 ---@field args? string[]
 ---@field env? table<string, string>
 ---@field cwd? string
@@ -18,11 +18,12 @@ local islist = vim.islist or vim.tbl_islist
 ---@param opts snacks.picker.proc.Config|{[1]: snacks.picker.Config, [2]: snacks.picker.proc.Config}
 ---@type snacks.picker.finder
 function M.proc(opts, ctx)
-  if islist(opts) then
+  if svim.islist(opts) then
     local transform = opts[2].transform
     opts = Snacks.config.merge(unpack(vim.deepcopy(opts))) --[[@as snacks.picker.proc.Config]]
     opts.transform = transform
   end
+  ---@cast opts snacks.picker.proc.Config
   assert(opts.cmd, "`opts.cmd` is required")
   ---@async
   return function(cb)
@@ -37,6 +38,13 @@ function M.proc(opts, ctx)
       end
     end
 
+    if ctx.picker.opts.debug.proc then
+      vim.schedule(function()
+        Snacks.debug.cmd(Snacks.config.merge(opts, { group = true }))
+      end)
+    end
+
+    local sep = opts.sep or "\n"
     local aborted = false
     local stdout = assert(uv.new_pipe())
 
@@ -45,7 +53,7 @@ function M.proc(opts, ctx)
     local spawn_opts = {
       args = opts.args,
       stdio = { nil, stdout, nil },
-      cwd = opts.cwd and vim.fs.normalize(opts.cwd) or nil,
+      cwd = opts.cwd and svim.fs.normalize(opts.cwd) or nil,
       env = opts.env,
       hide = true,
     }
@@ -58,7 +66,6 @@ function M.proc(opts, ctx)
         vim.list_extend(full, opts.args or {})
         Snacks.notify.error(("Command failed:\n- cmd: `%s`"):format(table.concat(full, " ")))
       end
-      stdout:close()
       handle:close()
       self:resume()
     end)
@@ -70,6 +77,10 @@ function M.proc(opts, ctx)
     local queue = require("snacks.picker.util.queue").new()
 
     self:on("abort", function()
+      stdout:read_stop()
+      if not stdout:is_closing() then
+        stdout:close()
+      end
       aborted = true
       queue:clear()
       cb = function() end
@@ -93,7 +104,7 @@ function M.proc(opts, ctx)
       end
       local from = 1
       while from <= #data do
-        local nl = data:find("\n", from, true)
+        local nl = data:find(sep, from, true)
         if nl then
           local cr = data:byte(nl - 1, nl - 1) == 13 -- \r
           local line = data:sub(from, nl - (cr and 2 or 1))
@@ -113,10 +124,12 @@ function M.proc(opts, ctx)
     end
 
     stdout:read_start(function(err, data)
-      if aborted then
+      assert(not err, err)
+      if aborted or not data then
+        stdout:close()
+        self:resume()
         return
       end
-      assert(not err, err)
       if M.USE_QUEUE then
         queue:push(data)
         self:resume()
@@ -125,14 +138,47 @@ function M.proc(opts, ctx)
       end
     end)
 
-    while not (handle:is_closing() and queue:empty()) do
+    while not (stdout:is_closing() and queue:empty()) do
       if queue:empty() then
         self:suspend()
       else
         process(queue:pop())
       end
     end
+    -- process the last line
+    if prev then
+      cb({ text = prev })
+    end
   end
+end
+
+---@param opts {cmd: string, args?: string[], cwd?: string}
+function M.debug(opts)
+  vim.schedule(function()
+    local lines = { opts.cmd } ---@type string[]
+    for _, arg in ipairs(opts.args or {}) do
+      arg = arg:find("[$%s]") and vim.fn.shellescape(arg) or arg
+      if #arg + #lines[#lines] > 40 then
+        lines[#lines] = lines[#lines] .. " \\"
+        table.insert(lines, "  " .. arg)
+      else
+        lines[#lines] = lines[#lines] .. " " .. arg
+      end
+    end
+    local id = opts.cmd
+    for _, a in ipairs(opts.args or {}) do
+      if a:find("^-") then
+        id = id .. " " .. a
+      end
+    end
+    Snacks.notify.info(
+      ("- **cwd**: `%s`\n```sh\n%s\n```"):format(
+        vim.fn.fnamemodify(svim.fs.normalize(opts.cwd or uv.cwd() or "."), ":~"),
+        table.concat(lines, "\n")
+      ),
+      { id = "snacks.picker.proc." .. id, title = "Snacks Proc" }
+    )
+  end)
 end
 
 return M

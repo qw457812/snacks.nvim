@@ -10,7 +10,7 @@ function M.path(item)
     return
   end
   item._path = item._path
-    or vim.fs.normalize(item.cwd and item.cwd .. "/" .. item.file or item.file, { _fast = true, expand_env = false })
+    or svim.fs.normalize(item.cwd and item.cwd .. "/" .. item.file or item.file, { _fast = true, expand_env = false })
   return item._path
 end
 
@@ -18,11 +18,11 @@ end
 ---@param len number
 ---@param opts? {cwd?: string, roughly?: boolean}
 function M.truncpath(path, len, opts)
-  local cwd = vim.fs.normalize(opts and opts.cwd or vim.fn.getcwd(), { _fast = true, expand_env = false })
-  local home = vim.fs.normalize("~")
-  path = vim.fs.normalize(path, { _fast = true, expand_env = false })
+  local cwd = svim.fs.normalize(opts and opts.cwd or vim.fn.getcwd(), { _fast = true, expand_env = false })
+  local home = svim.fs.normalize("~")
+  path = svim.fs.normalize(path, { _fast = true, expand_env = false })
 
-  if path:find(cwd, 1, true) == 1 and #path > #cwd then
+  if path:find(cwd .. "/", 1, true) == 1 and #path > #cwd then
     path = path:sub(#cwd + 2)
   else
     local root = Snacks.git.get_root(path)
@@ -33,6 +33,7 @@ function M.truncpath(path, len, opts)
       path = "~" .. path:sub(#home + 1)
     end
   end
+  path = path:gsub("/$", "")
 
   if opts and opts.roughly == false then
     return M.truncate(path, len, -1)
@@ -178,13 +179,15 @@ end
 
 ---@param str string
 ---@param data table<string, string>
-function M.tpl(str, data)
-  return (
+---@param opts? {prefix?: string, indent?: boolean, offset?: number[]}
+function M.tpl(str, data, opts)
+  opts = opts or {}
+  local ret = (
     str:gsub(
-      "(%b{})",
+      "(" .. vim.pesc(opts.prefix or "") .. "%b{}" .. ")",
       ---@param w string
       function(w)
-        local inner = w:sub(2, -2)
+        local inner = w:sub(2 + #(opts.prefix or ""), -2)
         local key, default = inner:match("^(.-):(.*)$")
         local ret = data[key or inner]
         if ret == "" and default then
@@ -194,6 +197,17 @@ function M.tpl(str, data)
       end
     )
   )
+  if opts.indent then
+    local lines = vim.split(ret:gsub("\t", "  "), "\n", { plain = true })
+    local indent = 1000
+    for _, line in ipairs(lines) do
+      indent = math.min(indent, line:find("%S") or 1000)
+    end
+    for l, line in ipairs(lines) do
+      lines[l] = line:sub(indent)
+    end
+  end
+  return ret
 end
 
 ---@param str string
@@ -358,6 +372,259 @@ function M.reltime(time)
     end
   end
   return os.date("%b %d, %Y", time) ---@type string
+end
+
+---@generic T: table
+---@param t T
+---@return T
+function M.shallow_copy(t)
+  local ret = {}
+  for k, v in pairs(t) do
+    ret[k] = v
+  end
+  return setmetatable(ret, getmetatable(t))
+end
+
+---@param opts? {main?: number, float?:boolean, filter?: fun(win:number, buf:number):boolean?}
+function M.pick_win(opts)
+  opts = Snacks.config.merge({
+    filter = function(win, buf)
+      return not vim.bo[buf].filetype:find("^snacks")
+    end,
+  }, opts)
+
+  local overlays = {} ---@type snacks.win[]
+  local chars = "asdfghjkl"
+  local wins = {} ---@type number[]
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    local buf = vim.api.nvim_win_get_buf(win)
+    local keep = (opts.float or vim.api.nvim_win_get_config(win).relative == "")
+      and (not opts.filter or opts.filter(win, buf))
+    if keep then
+      wins[#wins + 1] = win
+    end
+  end
+  if #wins == 1 then
+    return wins[1]
+  elseif #wins == 0 then
+    return
+  end
+  for _, win in ipairs(wins) do
+    local c = chars:sub(1, 1)
+    chars = chars:sub(2)
+    overlays[c] = Snacks.win({
+      backdrop = false,
+      win = win,
+      focusable = false,
+      enter = false,
+      relative = "win",
+      width = 7,
+      height = 3,
+      text = ("       \n   %s   \n       "):format(c),
+      wo = {
+        winhighlight = "NormalFloat:SnacksPickerPickWin" .. (win == opts.main and "Current" or ""),
+      },
+    })
+  end
+  vim.cmd([[redraw!]])
+  local char = vim.fn.getcharstr()
+  for _, overlay in pairs(overlays) do
+    overlay:close()
+  end
+  local win = (char == Snacks.util.keycode("<cr>")) or overlays[char]
+  if win and type(win) == "table" then
+    return win.opts.win
+  elseif win then
+    return opts.main
+  end
+end
+
+---@param path string
+---@param cwd? string
+---@return fun(): string?
+function M.parents(path, cwd)
+  cwd = cwd or uv.cwd()
+  if not (cwd and path:sub(1, #cwd) == cwd and #path > #cwd) then
+    return function() end
+  end
+  local to = #cwd + 1 ---@type number?
+  return function()
+    to = path:find("/", to + 1, true)
+    return to and path:sub(1, to - 1) or nil
+  end
+end
+
+--- Checks if the path is a directory,
+--- if not it returns the parent directory
+---@param item string|snacks.picker.Item
+function M.dir(item)
+  local path = type(item) == "table" and M.path(item) or item
+  ---@cast path string
+  path = svim.fs.normalize(path)
+  return vim.fn.isdirectory(path) == 1 and path or vim.fs.dirname(path)
+end
+
+---@param paths string[]
+---@param dir string
+function M.copy(paths, dir)
+  dir = svim.fs.normalize(dir)
+  paths = vim.tbl_map(svim.fs.normalize, paths) ---@type string[]
+  for _, path in ipairs(paths) do
+    local name = vim.fn.fnamemodify(path, ":t")
+    local to = dir .. "/" .. name
+    M.copy_path(path, to)
+  end
+end
+
+---@param from string
+---@param to string
+function M.copy_path(from, to)
+  if not uv.fs_stat(from) then
+    Snacks.notify.error(("File `%s` does not exist"):format(from))
+    return
+  end
+  if vim.fn.isdirectory(from) == 1 then
+    M.copy_dir(from, to)
+  else
+    M.copy_file(from, to)
+  end
+end
+
+---@param from string
+---@param to string
+function M.copy_file(from, to)
+  if vim.fn.filereadable(from) == 0 then
+    Snacks.notify.error(("File `%s` is not readable"):format(from))
+    return
+  end
+  if uv.fs_stat(to) then
+    Snacks.notify.error(("File `%s` already exists"):format(to))
+    return
+  end
+  local dir = vim.fs.dirname(to)
+  vim.fn.mkdir(dir, "p")
+  local ok, err = uv.fs_copyfile(from, to, { excl = true, ficlone = true })
+  if not ok then
+    Snacks.notify.error(("Failed to copy file:\n - from: `%s`\n- to: `%s`\n%s"):format(from, to, err))
+  end
+end
+
+---@param from string
+---@param to string
+function M.copy_dir(from, to)
+  if vim.fn.isdirectory(from) == 0 then
+    Snacks.notify.error(("Directory `%s` does not exist"):format(from))
+    return
+  end
+  vim.fn.mkdir(to, "p")
+  for fname in vim.fs.dir(from, { follow = false }) do
+    local path = from .. "/" .. fname
+    M.copy_path(path, to .. "/" .. fname)
+  end
+end
+
+---@param buf number
+---@return (vim.bo|vim.wo)?
+function M.modeline(buf)
+  if not vim.api.nvim_buf_is_valid(buf) then
+    return
+  end
+  local lines = vim.api.nvim_buf_get_lines(buf, 0, vim.o.modelines, false)
+  vim.list_extend(lines, vim.api.nvim_buf_get_lines(buf, -vim.o.modelines, -1, false))
+  for _, line in ipairs(lines) do
+    local m, options = line:match("%S*%s+(%w+):%s*(.-)%s*$")
+    if vim.tbl_contains({ "vi", "vim", "ex" }, m) and options then
+      local set = vim.split(options, "[:%s]+")
+      local ret = {} ---@type table<string, any>
+      for _, v in ipairs(set) do
+        if v ~= "" then
+          local k, val = v:match("([^=]+)=(.+)")
+          if k then
+            ret[k] = tonumber(val) or val
+          else
+            ret[v:gsub("^no", "")] = v:find("^no") and false or true
+          end
+        end
+      end
+      return ret
+    end
+  end
+end
+
+--- Gets the list of binaries in the PATH.
+--- This won't check if the binary is executable.
+--- On Windows, additional extensions are checked.
+function M.get_bins()
+  local is_win = jit.os:find("Windows")
+  local path = vim.split(os.getenv("PATH") or "", is_win and ";" or ":", { plain = true })
+  local bins = {} ---@type table<string, string>
+  for _, p in ipairs(path) do
+    p = svim.fs.normalize(p)
+    for file, t in vim.fs.dir(p) do
+      if t ~= "directory" then
+        local fpath = p .. "/" .. file
+        local base, ext = file:match("^(.*)%.(%a+)$")
+        if is_win then
+          if base and ext and vim.tbl_contains({ "exe", "bat", "com", "cmd" }, ext) then
+            bins[base] = bins[base] or fpath
+          end
+        else
+          bins[file] = bins[file] or fpath
+        end
+      end
+    end
+  end
+  return bins
+end
+
+---@param glob string
+function M.glob2pattern(glob)
+  local pattern = ""
+  local i = 1
+  while i <= #glob do
+    local c = glob:sub(i, i)
+    if c == "*" then
+      if i + 1 <= #glob and glob:sub(i + 1, i + 1) == "*" then -- '**'
+        pattern = pattern .. ".*"
+        i = i + 2
+      else -- '*'
+        pattern = pattern .. "[^/]*"
+        i = i + 1
+      end
+    elseif c == "?" then
+      pattern = pattern .. "[^/]" -- Match exactly one non-'/' character
+      i = i + 1
+    else
+      c = c:match("^[%^%$%(%)%%%.%[%]%+%-]$") and "%" .. c or c
+      pattern = pattern .. c
+      i = i + 1
+    end
+  end
+  pattern = pattern .. "$"
+  pattern = pattern
+    :gsub("^" .. vim.pesc("[^/]*"), "")
+    :gsub("^" .. vim.pesc(".*"), "")
+    :gsub(vim.pesc("[^/]*$") .. "$", "")
+    :gsub(vim.pesc(".*$") .. "$", "")
+  return pattern
+end
+
+---@param globs string[]
+---@return fun(file: string): boolean
+function M.globber(globs)
+  local patterns = {} ---@type string[]
+  for _, glob in ipairs(globs) do
+    table.insert(patterns, M.glob2pattern(glob))
+  end
+  ---@param file string
+  return function(file)
+    for _, pattern in ipairs(patterns) do
+      if file:find(pattern) then
+        return true
+      end
+    end
+    return false
+  end
 end
 
 return M

@@ -1,8 +1,5 @@
 local M = {}
 
----@class snacks.picker
----@field buffers fun(opts?: snacks.picker.buffers.Config): snacks.Picker
-
 ---@param opts snacks.picker.buffers.Config
 ---@type snacks.picker.finder
 function M.buffers(opts, ctx)
@@ -21,15 +18,17 @@ function M.buffers(opts, ctx)
       and (opts.unloaded or vim.api.nvim_buf_is_loaded(buf))
       and (opts.current or buf ~= current_buf)
       and (opts.nofile or vim.bo[buf].buftype ~= "nofile")
+      and (not opts.modified or vim.bo[buf].modified)
     if keep then
       local name = vim.api.nvim_buf_get_name(buf)
       if name == "" then
         name = "[No Name]" .. (vim.bo[buf].filetype ~= "" and " " .. vim.bo[buf].filetype or "")
       end
       local info = vim.fn.getbufinfo(buf)[1]
+      local mark = vim.api.nvim_buf_get_mark(buf, '"')
       local flags = {
         buf == current_buf and "%" or (buf == alternate_buf and "#" or ""),
-        info.hidden == 1 and "h" or "a",
+        info.hidden == 1 and "h" or (#(info.windows or {}) > 0) and "a" or "",
         vim.bo[buf].readonly and "=" or "",
         info.changed == 1 and "+" or "",
       }
@@ -39,7 +38,7 @@ function M.buffers(opts, ctx)
         text = buf .. " " .. name,
         file = name,
         info = info,
-        pos = { info.lnum, 0 },
+        pos = mark[1] ~= 0 and mark or { info.lnum, 0 },
       })
     end
   end

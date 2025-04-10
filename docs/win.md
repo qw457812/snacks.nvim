@@ -208,7 +208,7 @@ docs for more information on how to customize these styles
 ---@field backdrop? snacks.win
 ---@field keys snacks.win.Keys[]
 ---@field events (snacks.win.Event|{event:string|string[]})[]
----@field meta table<string, string>
+---@field meta table<string, any>
 ---@field closed? boolean
 Snacks.win = {}
 ```
@@ -289,6 +289,12 @@ win:dim(parent)
 win:execute(actions)
 ```
 
+### `win:fixbuf()`
+
+```lua
+win:fixbuf()
+```
+
 ### `win:focus()`
 
 ```lua
@@ -349,6 +355,12 @@ win:map()
 win:on(event, cb, opts)
 ```
 
+### `win:on_current_tab()`
+
+```lua
+win:on_current_tab()
+```
+
 ### `win:on_resize()`
 
 ```lua
@@ -379,6 +391,13 @@ win:scratch()
 ```lua
 ---@param up? boolean
 win:scroll(up)
+```
+
+### `win:set_buf()`
+
+```lua
+---@param buf number
+win:set_buf(buf)
 ```
 
 ### `win:set_title()`

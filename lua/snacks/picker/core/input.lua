@@ -6,7 +6,6 @@
 local M = {}
 M.__index = M
 
-local uv = vim.uv or vim.loop
 local ns = vim.api.nvim_create_namespace("snacks.picker.input")
 
 ---@param picker snacks.Picker
@@ -19,22 +18,24 @@ function M.new(picker)
 
   self.win = Snacks.win(Snacks.win.resolve(picker.opts.win.input, {
     show = false,
-    enter = true,
+    enter = false,
     height = 1,
-    text = picker.opts.live and self.filter.search or self.filter.pattern,
     ft = "regex",
-    on_win = function(win)
-      -- HACK: set all other picker input prompt buffers to nofile.
-      -- Otherwise when the prompt buffer is closed,
-      -- Neovim always stops insert mode.
-      for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-        if buf ~= win.buf and vim.bo[buf].filetype == "snacks_picker_input" then
-          vim.bo[buf].buftype = "nofile"
-        end
+    on_buf = function(win)
+      -- HACK: this is needed to prevent Neovim from stopping insert mode,
+      -- for any other picker input we are leaving.
+      local buf = vim.api.nvim_get_current_buf()
+      if buf ~= win.buf and vim.bo[buf].filetype == "snacks_picker_input" then
+        vim.bo[buf].buftype = "nofile"
       end
       vim.fn.prompt_setprompt(win.buf, "")
-      win:focus()
-      vim.cmd("startinsert!")
+      vim.bo[win.buf].modified = false
+      local text = picker.opts.live and self.filter.search or self.filter.pattern
+      vim.api.nvim_buf_set_lines(win.buf, 0, -1, false, { text })
+      vim.bo[win.buf].modified = false
+    end,
+    on_win = function()
+      self:highlights()
     end,
     bo = {
       filetype = "snacks_picker_input",
@@ -47,6 +48,11 @@ function M.new(picker)
     },
   }))
 
+  self.win:on("BufEnter", function()
+    vim.bo[self.win.buf].buftype = "prompt"
+    vim.cmd("startinsert!")
+  end, { buf = true })
+
   local ref = Snacks.util.ref(self)
   self.win:on(
     { "TextChangedI", "TextChanged" },
@@ -55,6 +61,7 @@ function M.new(picker)
       if not input or not input.win:valid() then
         return
       end
+      vim.bo[input.win.buf].modified = false
       -- only one line
       -- Can happen when someone pastes a multiline string
       if vim.api.nvim_buf_line_count(input.win.buf) > 1 then
@@ -72,10 +79,21 @@ function M.new(picker)
       vim.schedule(function()
         input.picker:find({ refresh = false })
       end)
-    end, { ms = picker.opts.live and 100 or 30 }),
+    end, { ms = picker.opts.live and 200 or 30 }),
     { buf = true }
   )
   return self
+end
+
+function M:highlights()
+  local m = vim.fn.matchadd
+  vim.api.nvim_win_call(self.win.win, function()
+    m("@punctuation.delimiter", "\\v(^|\\s|:|\\!)\\zs['^]")
+    m("@punctuation.delimiter", "\\v['$]\\ze(\\s|$)")
+    m("DiagnosticWarn", "\\v(^|\\s|:)\\zs\\!")
+    m("@keyword", "\\v(^|\\s)\\zs\\w+:")
+    m("@operator", "\\v\\s\\zs\\|\\ze\\s")
+  end)
 end
 
 function M:close()
@@ -125,7 +143,7 @@ function M:update()
   end
   local line = {} ---@type snacks.picker.Highlight[]
   if self.picker:is_active() then
-    line[#line + 1] = { M.spinner(), "SnacksPickerSpinner" }
+    line[#line + 1] = { Snacks.util.spinner(), "SnacksPickerSpinner" }
     line[#line + 1] = { " " }
   end
   local selected = #self.picker.list.selected
@@ -161,16 +179,12 @@ function M:set(pattern, search)
   vim.api.nvim_buf_set_lines(self.win.buf, 0, -1, false, {
     self.picker.opts.live and self.filter.search or self.filter.pattern,
   })
+  vim.bo[self.win.buf].modified = false
   vim.api.nvim_win_set_cursor(self.win.win, { 1, #self:get() + 1 })
   self.totals = ""
   self.win.opts.wo.statuscolumn = ""
   self:update()
   self.picker:update_titles()
-end
-
-function M.spinner()
-  local spinner = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" }
-  return spinner[math.floor(uv.hrtime() / (1e6 * 80)) % #spinner + 1]
 end
 
 return M
