@@ -92,7 +92,6 @@ Snacks.debug.inspect(...)
 ### `Snacks.debug.log()`
 
 Log a message to the file `./debug.log`.
-
 - a timestamp will be added to every message.
 - accepts multiple arguments and pretty prints them.
 - if the argument is not a string, it will be printed using `vim.inspect`.
@@ -116,9 +115,8 @@ Snacks.debug.metrics()
 ### `Snacks.debug.profile()`
 
 Very simple function to profile a lua function.
-
-- **flush**: set to `true` to use `jit.flush` in every iteration.
-- **count**: defaults to 100
+* **flush**: set to `true` to use `jit.flush` in every iteration.
+* **count**: defaults to 100
 
 ```lua
 ---@param fn fun()
