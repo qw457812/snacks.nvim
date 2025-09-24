@@ -38,7 +38,7 @@ vim.api.nvim_create_autocmd("BufWinEnter", {
       return
     end
     local win = vim.api.nvim_get_current_win()
-    if buf ~= vim.api.nvim_win_get_buf(win) or vim.w[win].snacks_picker_preview then
+    if buf ~= vim.api.nvim_win_get_buf(win) or vim.w[win].snacks_picker_preview or Snacks.util.is_float(win) then
       return
     end
     vim.b[buf].snacks_previewed = nil
