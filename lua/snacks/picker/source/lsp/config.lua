@@ -234,12 +234,25 @@ function M.preview(ctx)
     lines[#lines + 1] = "- **filetypes**: " .. list(ft)
   end
 
+  -- root markers
+  local markers = config.root_markers or {}
+  if #markers > 0 then
+    lines[#lines + 1] = "- **root markers**: " .. list(markers)
+  end
+
   local clients = vim.lsp.get_clients({ name = item.name })
   if #clients > 0 then
     for _, client in ipairs(clients) do
       lines[#lines + 1] = ""
       lines[#lines + 1] = "## Client [id=" .. client.id .. "]"
       lines[#lines + 1] = ""
+
+      -- server info
+      for k, v in pairs(client.server_info or {}) do
+        lines[#lines + 1] = ("- **%s**: `%s`"):format(k, v)
+      end
+
+      -- workspaces
       local roots = {} ---@type string[]
       for _, ws in ipairs(client.workspace_folders or {}) do
         roots[#roots + 1] = vim.uri_to_fname(ws.uri)
@@ -255,10 +268,21 @@ function M.preview(ctx)
           lines[#lines + 1] = "- **workspace**: `" .. norm(roots[1]) .. "`"
         end
       end
+
+      -- buffers
       lines[#lines + 1] = "- **buffers**: " .. list(vim.tbl_keys(client.attached_buffers))
+
+      -- settings
       local settings = vim.inspect(client.settings)
       lines[#lines + 1] = "- **settings**:"
       lines[#lines + 1] = "```lua\n" .. settings .. "\n```"
+
+      -- init options
+      if client.config.init_options then
+        local init_options = vim.inspect(client.config.init_options)
+        lines[#lines + 1] = "- **init options**:"
+        lines[#lines + 1] = "```lua\n" .. init_options .. "\n```"
+      end
     end
   end
 
