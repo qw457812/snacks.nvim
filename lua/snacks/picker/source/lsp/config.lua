@@ -220,7 +220,8 @@ function M.preview(ctx)
   end
 
   if item.cmd then
-    lines[#lines + 1] = "- **cmd**: `" .. table.concat(item.cmd, " ") .. "`"
+    local cmd = type(item.cmd) == "function" and "<function>" or table.concat(item.cmd, " ")
+    lines[#lines + 1] = "- **cmd**: `" .. cmd .. "`"
   end
 
   if item.installed then
